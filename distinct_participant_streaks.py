@@ -1,6 +1,19 @@
+import argparse
 import json
 import sys
 from datetime import date, timedelta
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--date1', type=date.fromisoformat, default='2008-05-17',
+                    help='One end (inclusive) of date range to search (default: %(default)s)')
+parser.add_argument('--date2', type=date.fromisoformat, default=date.today(),
+                    help='Other end (exclusive) of date range to search (default: %(default)s). '
+                         'If earlier than date1, search will run backwards in time.')
+parser.add_argument('--minlength', type=int, default=14,
+                    help='Minimum length of streak to report (default: %(default)s)')
+args = parser.parse_args()
+
+step = timedelta(days=1) if args.date2 > args.date1 else timedelta(days=-1)
 
 # Assume expedition data ends up as a list of
 # {date: {participant: expedition}}}
@@ -22,8 +35,6 @@ with open('alldata.js') as js:
 
 print("Loaded", len(expeditions), "expeditions", file=sys.stderr)
 
-step = timedelta(days=-1)
-
 def find_streaks(day, participants_seen, sequence):
   participants_day = expeditions.get(day, {})
   for participant in set(participants_day.keys()).difference(participants_seen):
@@ -32,14 +43,18 @@ def find_streaks(day, participants_seen, sequence):
     yield sequence
 
 print('{| class="wikitable sortable"')
-start_date = date.today() #date(2008, 5, 17)
+print("|-")
+print("! Starting")
+print("! Days")
+print("! Example")
+start_date = args.date1
 seen_end_dates = set() # Suppress sub-streaks
-while start_date >= date(2008, 5, 1):
+while start_date != args.date2:
   print("Trying", start_date, file=sys.stderr)
   some_longest_sequence = max(find_streaks(start_date, set(), []), key=lambda s: len(s))
   longest_length = len(some_longest_sequence)
   end_date = start_date + step*longest_length
-  if longest_length > 14 and end_date not in seen_end_dates:
+  if longest_length >= args.minlength and end_date not in seen_end_dates:
     seen_end_dates.add(end_date)
     print("|-")
     print("|", start_date)
