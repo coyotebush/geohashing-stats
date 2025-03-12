@@ -14,29 +14,30 @@ with open('alldata.js') as js:
   for expedition in json.loads(json_str):
     title = expedition[0]
     day_str = title[0:10]
+    day = date.fromisoformat(day_str)
     participants = expedition[3]
     success = expedition[4]
     if success:
-      expeditions.setdefault(day_str, {}).update({p: title for p in participants})
+      expeditions.setdefault(day, {}).update({p: title for p in participants})
 
 print("Loaded", len(expeditions), "expeditions", file=sys.stderr)
 
 step = timedelta(days=-1)
 
 def find_streaks(day, participants_seen, sequence):
-  day_str = day.isoformat()
-  participants_day = expeditions.get(day_str, {})
+  participants_day = expeditions.get(day, {})
   for participant in set(participants_day.keys()).difference(participants_seen):
     yield from find_streaks(day + step, participants_seen.union([participant]), [*sequence, (participant, participants_day[participant])])
   else:
-    yield (len(sequence), sequence)
+    yield sequence
 
 print('{| class="wikitable sortable"')
 start_date = date.today() #date(2008, 5, 17)
 seen_end_dates = set() # Suppress sub-streaks
 while start_date >= date(2008, 5, 1):
   print("Trying", start_date, file=sys.stderr)
-  longest_length, some_longest_sequence = max(find_streaks(start_date, set(), []))
+  some_longest_sequence = max(find_streaks(start_date, set(), []), key=lambda s: len(s))
+  longest_length = len(some_longest_sequence)
   end_date = start_date + step*longest_length
   if longest_length > 14 and end_date not in seen_end_dates:
     seen_end_dates.add(end_date)
