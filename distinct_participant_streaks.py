@@ -11,6 +11,7 @@ parser.add_argument('--date2', type=date.fromisoformat, default=date.today(),
                          'If earlier than date1, search will run backwards in time.')
 parser.add_argument('--minlength', type=int, default=14,
                     help='Minimum length of streak to report (default: %(default)s)')
+parser.add_argument('-v', '--verbose', action='count', default=0)
 args = parser.parse_args()
 
 step = timedelta(days=1) if args.date2 > args.date1 else timedelta(days=-1)
@@ -36,6 +37,8 @@ with open('alldata.js') as js:
 print("Loaded", len(expeditions), "expeditions", file=sys.stderr)
 
 def find_streaks(day, participants_seen, sequence):
+  if args.verbose >= 2:
+    print("Visiting", day, end='\r', file=sys.stderr)
   participants_day = expeditions.get(day, {})
   for participant in set(participants_day.keys()).difference(participants_seen):
     yield from find_streaks(day + step, participants_seen.union([participant]), [*sequence, (participant, participants_day[participant])])
@@ -50,7 +53,8 @@ print("! Example")
 start_date = args.date1
 seen_end_dates = set() # Suppress sub-streaks
 while start_date != args.date2:
-  print("Trying", start_date, file=sys.stderr)
+  if args.verbose >= 1:
+    print("Starting from", start_date, file=sys.stderr)
   some_longest_sequence = max(find_streaks(start_date, set(), []), key=lambda s: len(s))
   longest_length = len(some_longest_sequence)
   end_date = start_date + step*longest_length
