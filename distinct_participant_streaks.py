@@ -11,6 +11,9 @@ parser.add_argument('--date2', type=date.fromisoformat, default=date.today(),
                          'If earlier than date1, search will run backwards in time.')
 parser.add_argument('--minlength', type=int, default=14,
                     help='Minimum length of streak to report (default: %(default)s)')
+parser.add_argument('--graticule', action='append',
+                    help='Only consider expeditions in this graticule (can be repeated). '
+                         'Example: --graticule=-37_144 --graticule=-37_145')
 parser.add_argument('-v', '--verbose', action='count', default=0)
 args = parser.parse_args()
 
@@ -28,10 +31,11 @@ with open('alldata.js') as js:
   for expedition in json.loads(json_str):
     title = expedition[0]
     day_str = title[0:10]
+    graticule = title[11:]
     day = date.fromisoformat(day_str)
     participants = expedition[3]
     success = expedition[4]
-    if success:
+    if success and (args.graticule is None or graticule in args.graticule):
       expeditions.setdefault(day, {}).update({p: title for p in participants})
 
 print("Loaded", len(expeditions), "expeditions", file=sys.stderr)
