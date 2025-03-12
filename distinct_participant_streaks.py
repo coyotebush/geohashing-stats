@@ -43,7 +43,7 @@ def find_streaks(day, participants_seen, sequence):
   for participant in set(participants_day.keys()).difference(participants_seen):
     yield from find_streaks(day + step, participants_seen.union([participant]), [*sequence, (participant, participants_day[participant])])
   else:
-    yield sequence
+    yield len(participants_day) == 0, sequence
 
 print('{| class="wikitable sortable"')
 print("|-")
@@ -55,7 +55,13 @@ seen_end_dates = set() # Suppress sub-streaks
 while start_date != args.date2:
   if args.verbose >= 1:
     print("Starting from", start_date, file=sys.stderr)
-  some_longest_sequence = max(find_streaks(start_date, set(), []), key=lambda s: len(s))
+  some_longest_sequence = []
+  for final, sequence in find_streaks(start_date, set(), []):
+    if len(sequence) > len(some_longest_sequence):
+      some_longest_sequence = sequence
+      if final:
+        break
+
   longest_length = len(some_longest_sequence)
   end_date = start_date + step*longest_length
   if longest_length >= args.minlength and end_date not in seen_end_dates:
