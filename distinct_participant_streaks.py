@@ -25,7 +25,7 @@ step = timedelta(days=1) if args.date2 > args.date1 else timedelta(days=-1)
 # {date: {participant: expedition}}}
 # For same-graticule mode:
 # {graticule: {date: {participant: expedition}}}
-expeditions = {}
+all_expeditions = {}
 
 # https://fippe.de/alldata.js
 with open('alldata.js') as js:
@@ -42,11 +42,13 @@ with open('alldata.js') as js:
     if success and (args.graticule is None or graticule in args.graticule):
       participant_map = {p: title for p in participants}
       if args.same_graticule:
-        expeditions.setdefault(graticule, {}).setdefault(day, {}).update(participant_map)
+        all_expeditions.setdefault(graticule, {}).setdefault(day, {}).update(participant_map)
       else:
-        expeditions.setdefault(day, {}).update(participant_map)
+        all_expeditions.setdefault(day, {}).update(participant_map)
 
-print("Loaded", len(expeditions), "expeditions", file=sys.stderr)
+print("Loaded expeditions for", len(all_expeditions),
+      "graticules" if args.same_graticule else "dates",
+      file=sys.stderr)
 
 def find_streaks(expeditions, day, participants_seen, sequence):
   if args.verbose >= 2:
@@ -60,7 +62,7 @@ def find_streaks(expeditions, day, participants_seen, sequence):
   else:
     yield len(participants_day) == 0, sequence
 
-def print_longest_streak(expeditions, start_date):
+def print_longest_streak(seen_end_dates, expeditions, start_date):
   if args.verbose >= 1:
     print("Starting from", start_date, file=sys.stderr)
   some_longest_sequence = []
@@ -88,12 +90,16 @@ print("! Starting")
 print("! Days")
 print("! Example")
 start_date = args.date1
-seen_end_dates = set() # Suppress sub-streaks
-while start_date != args.date2:
-  if args.same_graticule:
-    for graticule_expeditions in expeditions.values():
-      print_longest_streak(graticule_expeditions, start_date)
-  else:
-    print_longest_streak(expeditions, start_date)
-  start_date += step
+if args.same_graticule:
+  graticule_seen_end_dates = {}
+  while start_date != args.date2:
+    for graticule, graticule_expeditions in all_expeditions.items():
+      print_longest_streak(graticule_seen_end_dates.setdefault(graticule, set()),
+                           graticule_expeditions, start_date)
+    start_date += step
+else:
+  all_seen_end_dates = set() # Suppress sub-streaks
+  while start_date != args.date2:
+    print_longest_streak(all_seen_end_dates, all_expeditions, start_date)
+    start_date += step
 print("|}")
