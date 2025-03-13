@@ -62,15 +62,27 @@ def find_streaks(expeditions, day, participants_seen, sequence):
   else:
     yield len(participants_day) == 0, sequence
 
+def upper_bound_streaks(expeditions, day):
+  participants_count_day = len(expeditions.get(day, {}))
+  if participants_count_day:
+    return participants_count_day * upper_bound_streaks(expeditions, day + step)
+  else:
+    return 1
+
 def print_longest_streak(seen_end_dates, expeditions, start_date):
   if args.verbose >= 1:
     print("Starting from", start_date, file=sys.stderr)
+    print("Estimated possible sequences:", upper_bound_streaks(expeditions, start_date))
   some_longest_sequence = []
+  sequences_count = 0
   for final, sequence in find_streaks(expeditions, start_date, set(), []):
+    sequences_count += 1
     if len(sequence) > len(some_longest_sequence):
       some_longest_sequence = sequence
       if final:
         break
+  if args.verbose >= 1:
+    print("Actual candidate sequences:", sequences_count)
 
   longest_length = len(some_longest_sequence)
   end_date = start_date + step*longest_length
