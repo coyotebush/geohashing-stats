@@ -50,17 +50,50 @@ print("Loaded expeditions for", len(all_expeditions),
       "graticules" if args.same_graticule else "dates",
       file=sys.stderr)
 
-def find_streaks(expeditions, day, participants_seen, sequence):
+def find_longest_streak(expeditions, day, participants_seen, sequence):
+  """
+  Returns the longest possible streak within the expeditions, starting on the given day,
+  not using any of the participants_seen, and appended to a previous sequence.
+  Also returns the set of participants whose presence in participants_seen (or some extended
+  version thereof) directly or indirectly led to running out of ways to continue a streak.
+  """
   if args.verbose >= 2:
     print("Visiting", day, end='\r', file=sys.stderr)
-  participants_day = expeditions.get(day, {})
-  for participant in set(participants_day.keys()).difference(participants_seen):
-    yield from find_streaks(expeditions,
-                            day + step,
-                            participants_seen.union([participant]),
-                            [*sequence, (participant, participants_day[participant])])
-  else:
-    yield len(participants_day) == 0, sequence
+  expeditions_day = expeditions.get(day, {})
+  participants_day = set(expeditions_day.keys())
+  participants_available = participants_day.difference(participants_seen)
+  participants_unavailable = participants_day.intersection(participants_seen)
+
+  if not participants_available:
+    # Report who would need to be available to continue the streak
+    return sequence, participants_day
+
+  limiting_participants = set()
+
+  longest_sequence = sequence
+
+  for participant in participants_available:
+    complete_sequence, next_participants \
+        = find_longest_streak(expeditions,
+                              day + step,
+                              participants_seen.union([participant]),
+                              [*sequence, (participant, expeditions_day[participant])])
+    if len(complete_sequence) > len(longest_sequence):
+      longest_sequence = complete_sequence
+
+    limiting_participants.update(next_participants)
+    if participant in next_participants:
+      # Choices that were unavailable to us might also be relevant
+      limiting_participants.update(participants_unavailable)
+      # Here we could omit participant from limiting_participants, but
+      # it doesn't matter for correctness - no other invocation in the stack
+      # is going to check for it anyway. (This might be more obvious if we
+      # tracked limiting choice *dates* rather than values.)
+      # It's easier to keep, and useful diagnostic information in the end.
+    else:
+      # No use continuing this loop!
+      break
+  return longest_sequence, limiting_participants
 
 def upper_bound_streaks(expeditions, day):
   participants_count_day = len(expeditions.get(day, {}))
@@ -72,17 +105,10 @@ def upper_bound_streaks(expeditions, day):
 def print_longest_streak(seen_end_dates, expeditions, start_date):
   if args.verbose >= 1:
     print("Starting from", start_date, file=sys.stderr)
-    print("Estimated possible sequences:", upper_bound_streaks(expeditions, start_date))
-  some_longest_sequence = []
-  sequences_count = 0
-  for final, sequence in find_streaks(expeditions, start_date, set(), []):
-    sequences_count += 1
-    if len(sequence) > len(some_longest_sequence):
-      some_longest_sequence = sequence
-      if final:
-        break
+    print("Estimated possible sequences:", upper_bound_streaks(expeditions, start_date), file=sys.stderr)
+  some_longest_sequence, limiting_participants = find_longest_streak(expeditions, start_date, set(), [])
   if args.verbose >= 1:
-    print("Actual candidate sequences:", sequences_count)
+    print("Limited by", limiting_participants, file=sys.stderr) # To make sure there are some non-trivial cases
 
   longest_length = len(some_longest_sequence)
   end_date = start_date + step*longest_length
